@@ -1,0 +1,535 @@
+-- 1. How many olympics games have been held?
+
+SELECT
+	COUNT(*)
+FROM
+	(
+		SELECT DISTINCT
+			GAMES
+		FROM
+			ATHLETE_EVENTS
+	) AS T1;
+
+ -- 2. List down all Olympics games held so far.
+
+SELECT DISTINCT
+	YEAR,
+	SEASON,
+	CITY
+FROM
+	ATHLETE_EVENTS
+ORDER BY
+	YEARASC;
+
+-- 3. Mention the total no of nations who participated in each olympics game?
+
+WITH
+	T1 AS (
+		SELECT
+			GAMES,
+			NR.REGION
+		FROM
+			ATHLETE_EVENTS AS AE
+			JOIN NOC_REGIONS AS NR ON AE.NOC = NR.NOC
+		GROUP BY
+			GAMES,
+			NR.REGION
+		ORDER BY
+			GAMES ASC
+	)
+SELECT
+	GAMES,
+	COUNT(REGION)
+FROM
+	T1
+GROUP BY
+	GAMES;
+
+-- 4. Which year saw the highest and lowest no of countries participating in olympics
+WITH
+	T1 AS (
+		SELECT
+			GAMES,
+			NR.REGION
+		FROM
+			ATHLETE_EVENTS AE
+			JOIN NOC_REGIONS NR ON AE.NOC = NR.NOC
+		GROUP BY
+			GAMES,
+			NR.REGION
+	),
+	T2 AS (
+		SELECT
+			GAMES,
+			COUNT(1) AS TOTAL_COUNTRIES
+		FROM
+			T1
+		GROUP BY
+			GAMES
+	)
+SELECT DISTINCT
+	CONCAT(
+		FIRST_VALUE(GAMES) OVER (
+			ORDER BY
+				TOTAL_COUNTRIES
+		),
+		'-',
+		FIRST_VALUE(TOTAL_COUNTRIES) OVER (
+			ORDER BY
+				TOTAL_COUNTRIES
+		)
+	) AS LOWEST_COUNTIES,
+	CONCAT(
+		FIRST_VALUE(GAMES) OVER (
+			ORDER BY
+				TOTAL_COUNTRIES DESC
+		),
+		'-',
+		FIRST_VALUE(TOTAL_COUNTRIES) OVER (
+			ORDER BY
+				TOTAL_COUNTRIES DESC
+		)
+	) AS HIGHEST_COUNTRIES
+FROM
+	T2;
+-- 5. Which nation has participated in all of the olympic games
+
+WITH
+	T1 AS (
+		SELECT
+			NR.REGION,
+			GAMES
+		FROM
+			ATHLETE_EVENTS AS AE
+			JOIN NOC_REGIONS AS NR ON NR.NOC = AE.NOC
+		GROUP BY
+			NR.REGION,
+			GAMES
+	),
+	T2 AS (
+		SELECT
+			REGION,
+			COUNT(1) AS TOTAL_PARTICIPATION
+		FROM
+			T1
+		GROUP BY
+			REGION
+	)
+SELECT
+	REGION,
+	TOTAL_PARTICIPATION
+FROM
+	T2
+ORDER BY
+	TOTAL_PARTICIPATION DESC
+LIMIT
+	5;
+
+-- 6. Identify the sport which was played in all summer olympics.
+
+WITH
+	T1 AS (
+		SELECT
+			COUNT(DISTINCT GAMES) AS NO_OF_GAMES
+		FROM
+			ATHLETE_EVENTS
+		WHERE
+			SEASON = 'Summer'
+	),
+	T2 AS (
+		SELECT DISTINCT
+			GAMES,
+			SPORT
+		FROM
+			ATHLETE_EVENTS
+		WHERE
+			SEASON = 'Summer'
+	),
+	T3 AS (
+		SELECT
+			SPORT,
+			COUNT(1) AS NO_OF_GAMES2
+		FROM
+			T2
+		GROUP BY
+			SPORT
+	)
+SELECT
+	*
+FROM
+	T3
+	JOIN T1 ON T1.NO_OF_GAMES = T3.NO_OF_GAMES2
+
+-- 7. Which Sports were just played only once in the olympics.
+
+SELECT
+	COUNT(DISTINCT SPORT) AS TOTAL_SPORTS,
+	YEAR
+FROM
+	ATHLETE_EVENTS
+GROUP BY
+	YEAR
+ORDER BY
+	TOTAL_SPORTS ASC;
+
+SELECT
+	*
+FROM
+	ATHLETE_EVENTS;
+
+-- 8. Fetch the total no of sports played in each olympic games.
+
+WITH
+	T1 AS (
+		SELECT DISTINCT
+			GAMES,
+			SPORT
+		FROM
+			ATHLETE_EVENTS
+	),
+	T2 AS (
+		SELECT
+			GAMES,
+			COUNT(1) AS NO_OF_SPORTS
+		FROM
+			T1
+		GROUP BY
+			GAMES
+	)
+SELECT
+	*
+FROMT2
+ORDER BY
+	NO_OF_SPORTS DESC;
+-- 9. Which Sports were just played only once in the olympics.
+
+WITH
+	T1 AS (
+		SELECT DISTINCT
+			SPORT,
+			GAMES
+		FROM
+			ATHLETE_EVENTS
+	),
+	T2 AS (
+		SELECT
+			SPORT,
+			COUNT(1) TOTAL_GAMES
+		FROM
+			T1
+		GROUP BY
+			SPORT
+	)
+SELECT
+	T2.*,
+	GAMES
+FROM
+	T2
+	JOIN T1 ON T1.SPORT = T2.SPORT
+WHERE
+	T2.TOTAL_GAMES = '1';
+
+
+-- 10. Fetch the top 5 athletes who have won the most gold medals.
+
+WITH
+	MEDAL_COUNT AS (
+		SELECT
+			NAME,
+			TEAM,
+			COUNT(1) AS TOTAL_MEDAL_COUNT
+		FROM
+			ATHLETE_EVENTS
+		WHERE
+			MEDAL = 'Gold'
+		GROUP BY
+			NAME,
+			TEAM
+		ORDER BY
+			TOTAL_MEDAL_COUNT DESC
+	),
+	MEDAL_COUNT_RANK AS (
+		SELECT
+			*,
+			DENSE_RANK() OVER (
+				ORDER BY
+					TOTAL_MEDAL_COUNT DESC
+			) AS RNK
+		FROM
+			MEDAL_COUNT
+	)
+SELECT
+	*
+FROM
+	MEDAL_COUNT_RANK
+WHERE
+	RNK <= 5
+LIMIT
+	5;
+-- 11 Fetch the top 5 athletes who have won the most medals (gold/silver/bronze).
+
+WITH
+	MOST_MEDALS AS (
+		SELECT
+			NAME,
+			TEAM,
+			COUNT(1) AS TOTAL_MEDAL_COUNT
+		FROM
+			ATHLETE_EVENTS
+		WHERE
+			MEDAL IN ('Gold', 'Bronze', 'Silver')
+		GROUP BY
+			NAME,
+			TEAM
+		ORDER BY
+			TOTAL_MEDAL_COUNT DESC
+	),
+	RANK_MEDAL AS (
+		SELECT
+			*,
+			DENSE_RANK() OVER (
+				ORDER BY
+					TOTAL_MEDAL_COUNT DESC
+			) AS RNK_MEDAL
+		FROM
+			MOST_MEDALS
+	)
+SELECT
+	*
+FROM
+	RANK_MEDAL
+WHERE
+	RNK_MEDAL <= 5
+LIMIT
+	5;
+	
+-- 12 Fetch the top 5 most successful countries in olympics.
+--    Success is defined by no of medals won ?
+WITH
+	COUNTRY_TOP AS (
+		SELECT
+			NOC_REGIONS.REGION AS COUNTRY,
+			COUNT(1) MEDAL_PER_COUNTRY
+		FROM
+			ATHLETE_EVENTS
+			JOIN NOC_REGIONS ON NOC_REGIONS.NOC = ATHLETE_EVENTS.NOC
+		WHERE
+			MEDAL IN ('Gold', 'Silver', 'Bronze')
+		GROUP BY
+			COUNTRY
+		ORDER BY
+			MEDAL_PER_COUNTRY DESC
+	),
+	COUNTRY_RANK AS (
+		SELECT
+			*,
+			DENSE_RANK() OVER (
+				ORDER BY
+					MEDAL_PER_COUNTRY DESC
+			) AS RNK
+		FROM
+			COUNTRY_TOP
+	)
+SELECT
+	*
+FROM
+	COUNTRY_RANK
+WHERE
+	RNK <= 5;
+	
+	
+-- 13. List down total gold, silver and bronze medals won by each country.
+
+WITH
+	G1 AS (
+		SELECT
+			REGION,
+			COUNT(1) AS GOLD
+		FROM
+			NOC_REGIONS
+			JOIN ATHLETE_EVENTS ON NOC_REGIONS.NOC = ATHLETE_EVENTS.NOC
+		WHERE
+			MEDAL = 'Gold'
+		GROUP BY
+			REGION
+	),
+	S1 AS (
+		SELECT
+			REGION,
+			COUNT(1) AS SILVER
+		FROM
+			NOC_REGIONS
+			JOIN ATHLETE_EVENTS ON NOC_REGIONS.NOC = ATHLETE_EVENTS.NOC
+		WHERE
+			MEDAL = 'Silver'
+		GROUP BY
+			REGION
+	),
+	B1 AS (
+		SELECT
+			REGION,
+			COUNT(1) AS BRONZE
+		FROM
+			NOC_REGIONS
+			JOIN ATHLETE_EVENTS ON NOC_REGIONS.NOC = ATHLETE_EVENTS.NOC
+		WHERE
+			MEDAL = 'Bronze'
+		GROUP BY
+			REGION
+	)
+SELECT
+	G1.REGION,
+	GOLD,
+	S1.SILVER,
+	B1.BRONZE
+FROM
+	G1
+	JOIN S1 ON G1.REGION = S1.REGION
+	JOIN B1 ON G1.REGION = B1.REGION
+ORDER BY
+	GOLD DESC,
+	SILVER DESC,
+	BRONZE DESC
+	;
+
+-- 14. List down total gold, silver and bronze medals won by 
+-- 	each country corresponding to each olympic games.
+
+WITH
+	G1 AS (
+		SELECT
+			GAMES,
+			REGION,
+			COUNT(1) AS GOLD
+		FROM
+			NOC_REGIONS
+			JOIN ATHLETE_EVENTS ON NOC_REGIONS.NOC = ATHLETE_EVENTS.NOC
+		WHERE
+			MEDAL = 'Gold'
+		GROUP BY
+			REGION,
+			GAMES
+		ORDER BY
+			GAMES
+	),
+	S1 AS (
+		SELECT
+			GAMES,
+			REGION,
+			COUNT(1) AS SILVER
+		FROM
+			NOC_REGIONS
+			JOIN ATHLETE_EVENTS ON NOC_REGIONS.NOC = ATHLETE_EVENTS.NOC
+		WHERE
+			MEDAL = 'Silver'
+		GROUP BY
+			REGION,
+			GAMES
+	),
+	B1 AS (
+		SELECT
+			GAMES,
+			REGION,
+			COUNT(1) AS BRONZE
+		FROM
+			NOC_REGIONS
+			JOIN ATHLETE_EVENTS ON NOC_REGIONS.NOC = ATHLETE_EVENTS.NOC
+		WHERE
+			MEDAL = 'Bronze'
+		GROUP BY
+			REGION,
+			GAMES
+	)
+SELECT
+	G1.REGION,
+	G1.GAMES,
+	G1.GOLD,
+	S1.SILVER,
+	B1.BRONZE
+FROM
+	G1
+	JOIN S1 ON G1.REGION = S1.REGION
+	JOIN B1 ON G1.REGION = B1.REGION
+ORDER BY
+	G1.GAMES,
+	S1.GAMES,
+	B1.GAMES;
+
+-- 15. Break down all olympic games where india won medal for Hockey and 
+-- how many medals in each olympic games
+
+   SELECT
+	TEAM,
+	SPORT,
+	GAMES,
+	COUNT(1) AS TOTAL_MEDALS
+FROM
+	ATHLETE_EVENTS
+WHERE
+	MEDAL <> 'NA'
+	AND TEAM = 'India'
+	AND SPORT = 'Hockey'
+GROUP BY
+	TEAM,
+	SPORT,
+	GAMES
+ORDER BY
+	TOTAL_MEDALS DESC;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
